@@ -79,7 +79,6 @@ const Payment = {
 
     const addClause = (field, value) => {
       if (value !== undefined) {
-        // NOTE: Column names are not quoted here because they are not dynamic variables
         setClauses.push(`${field} = $${paramIndex++}`);
         values.push(value);
       }
@@ -136,6 +135,7 @@ const Payment = {
   },
 };
 
-initPaymentTable();
+// initPaymentTable(); // REMOVED - Initialization is now controlled in server.js
 
 module.exports = Payment;
+module.exports.initPaymentTable = initPaymentTable; // EXPORTED
