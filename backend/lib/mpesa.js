@@ -1,41 +1,61 @@
 // lib/mpesa.js
-const axios = require('axios');
-require('dotenv').config();
+const axios = require("axios");
+require("dotenv").config();
 
 const {
-  MPESA_ENV, MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET,
-  MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL
+  MPESA_ENV,
+  MPESA_CONSUMER_KEY,
+  MPESA_CONSUMER_SECRET,
+  MPESA_SHORTCODE,
+  MPESA_PASSKEY,
+  MPESA_CALLBACK_URL,
 } = process.env;
 
 function endpoints() {
-  if (MPESA_ENV === 'sandbox') {
-    return {
-      oauth: 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-      stk: 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
-    };
-  }
+  const baseURL =
+    MPESA_ENV === "sandbox"
+      ? "https://sandbox.safaricom.co.ke"
+      : "https://api.safaricom.co.ke";
+
   return {
-    oauth: 'https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-    stk: 'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+    oauth: `${baseURL}/oauth/v1/generate?grant_type=client_credentials`,
+    stk: `${baseURL}/mpesa/stkpush/v1/processrequest`,
   };
 }
 
 async function getToken() {
   const url = endpoints().oauth;
-  const auth = Buffer.from(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`).toString('base64');
+  const auth = Buffer.from(
+    `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`
+  ).toString("base64");
+
   const res = await axios.get(url, {
-    headers: { Authorization: `Basic ${auth}` }
+    headers: { Authorization: `Basic ${auth}` },
   });
   return res.data.access_token;
 }
 
 function buildPassword() {
-  const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14); // YYYYMMDDhhmmss
+  // Generate timestamp in YYYYMMDDhhmmss format
+  const date = new Date();
+  const year = date.getFullYear().toString();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const hour = date.getHours().toString().padStart(2, "0");
+  const minute = date.getMinutes().toString().padStart(2, "0");
+  const second = date.getSeconds().toString().padStart(2, "0");
+
+  const timestamp = `${year}${month}${day}${hour}${minute}${second}`;
+
   const raw = `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`;
-  return { password: Buffer.from(raw).toString('base64'), timestamp };
+  return { password: Buffer.from(raw).toString("base64"), timestamp };
 }
 
-async function initiateStkPush({ amount, phoneNumber, accountReference = 'order' }) {
+async function initiateStkPush({
+  amount,
+  phoneNumber,
+  accountReference = "ORDER",
+}) {
   const token = await getToken();
   const { password, timestamp } = buildPassword();
   const url = endpoints().stk;
@@ -44,21 +64,21 @@ async function initiateStkPush({ amount, phoneNumber, accountReference = 'order'
     BusinessShortCode: MPESA_SHORTCODE,
     Password: password,
     Timestamp: timestamp,
-    TransactionType: 'CustomerPayBillOnline',
+    TransactionType: "CustomerPayBillOnline",
     Amount: amount,
     PartyA: phoneNumber,
     PartyB: MPESA_SHORTCODE,
     PhoneNumber: phoneNumber,
     CallBackURL: MPESA_CALLBACK_URL,
     AccountReference: accountReference,
-    TransactionDesc: 'Payment'
+    TransactionDesc: "School Fee Payment",
   };
 
   const res = await axios.post(url, body, {
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+      "Content-Type": "application/json",
+    },
   });
   return res.data;
 }
